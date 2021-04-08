@@ -10,13 +10,14 @@ class RegisterViewSerializer(serializers.ModelSerializer):
     """用户注册序列化器"""
 
     password2 = serializers.CharField(label='确认密码', write_only=True)
-    sms_code = serializers.CharField(label='验证码', write_only=True)
+    email_code = serializers.CharField(label='邮箱验证码', write_only=True)
+    sms_code = serializers.CharField(label='短信验证码', write_only=True)
     allow = serializers.CharField(label='同意协议', write_only=True)
     token = serializers.CharField(label='token', read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'mobile', 'password', 'password2', 'sms_code', 'allow', 'token']
+        fields = ['id', 'username', 'mobile', 'password', 'password2', 'sms_code', 'allow', 'token', 'email_code', 'email']
         extra_kwargs = {
             'username': {
                 'min_length': 5,
@@ -27,6 +28,7 @@ class RegisterViewSerializer(serializers.ModelSerializer):
                 }
             },
             'password': {
+                'write_only': True,
                 'min_length': 8,
                 'max_length': 20,
                 'error_messages': {
@@ -52,20 +54,26 @@ class RegisterViewSerializer(serializers.ModelSerializer):
         """"校验密码、验证码"""
         if attrs['password2'] != attrs['password']:
             raise serializers.ValidationError('两个密码不一致')
-        redis_conn = get_redis_connection('verify_codes')
-        real_sms_code = redis_conn.get('sms_%s' % attrs['mobile'])
+        redis_conn_sms = get_redis_connection('sms_codes')
+        real_sms_code = redis_conn_sms.get('sms_%s' % attrs['mobile'])
         if real_sms_code is None or attrs['sms_code'] != real_sms_code.decode():
-            raise serializers.ValidationError('验证码错误')
+            raise serializers.ValidationError('短信验证码错误')
+        redis_conn_email = get_redis_connection('email_codes')
+        real_email_code = redis_conn_email.get('email_%s' % attrs['email'])
+        if real_email_code is None or attrs['email_code'] != real_email_code.decode():
+            raise serializers.ValidationError('邮箱验证码错误')
         return attrs
 
     def create(self, validated_data):
         del validated_data['password2']
         del validated_data['allow']
         del validated_data['sms_code']
+        del validated_data['email_code']
 
         password = validated_data.pop('password')
         user = User.objects.create(**validated_data)
         user.set_password(password)
+        user.save()
 
         # 生成token
         jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER  # 引用jwt_payload_handler函数(生成payload)
@@ -76,5 +84,14 @@ class RegisterViewSerializer(serializers.ModelSerializer):
 
         return user
 
+
+class LoginViewSerializer(serializers.ModelSerializer):
+    """用户登录序列化器"""
+    sms_code = serializers.CharField(label='验证码', write_only=True)
+    token = serializers.CharField(label='token', read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['username', 'mobile', 'password', 'sms_code', 'token']
 
 
