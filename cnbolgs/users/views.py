@@ -3,14 +3,21 @@ from django.core.mail import send_mail
 from django.http import JsonResponse
 from django_redis import get_redis_connection
 from rest_framework import status
-from rest_framework.generics import CreateAPIView, RetrieveAPIView
+from rest_framework.decorators import action
+from rest_framework.generics import CreateAPIView, RetrieveAPIView, GenericAPIView
+from rest_framework.mixins import CreateModelMixin
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import GenericViewSet
+from rest_framework_jwt.settings import api_settings
+from rest_framework_jwt.utils import jwt_response_payload_handler
+from rest_framework_jwt.views import ObtainJSONWebToken
 
 from .models import User
 from .serializers import RegisterViewSerializer
 from libs.yuntongxun import sms
 from cnbolgs import settings
+from .utils import jwt_response_payload_handler
 
 
 class UsernameCountView(APIView):
@@ -84,8 +91,36 @@ class VerifyEmail(APIView):
         return Response({'message': 'OK'})
 
 
-class LoginView(APIView):
-    """用户登录"""
+class LoginAccountView(ObtainJSONWebToken):
+    """用户昵称和邮箱登录"""
 
-    def post(self, request):
-        pass
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.object.get('user') or request.user
+            token = serializer.object.get('token')
+            response_data = jwt_response_payload_handler(token, user, request)
+            return Response(response_data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LoginMobileView(APIView):
+    """手机号验证码登录"""
+
+    def post(self, request, *args, **kwargs):
+        mobile = request.mobile
+        sms_code = request.sms_code
+        user = request.user
+        redis_conn_sms = get_redis_connection('sms_codes')
+        real_sms_code = redis_conn_sms.get('sms_%s' % mobile)
+        if real_sms_code is None or sms_code != real_sms_code.decode():
+            return Response({'message': '短信验证码错误'})
+
+        # 生成token
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER  # 引用jwt_payload_handler函数(生成payload)
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER  # 生成jwt
+        payload = jwt_payload_handler(user)  # 根据user生成用户相关的载荷
+        token = jwt_encode_handler(payload)  # 传入载荷生成完整的jwt
+        user.token = token
+        response_data = {'user_id': user.id, 'username': user.username, 'token': token}
+        return Response(response_data)

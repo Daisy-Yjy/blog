@@ -16,7 +16,6 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
 
@@ -226,9 +225,10 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
 }
 
-# JWT的有效期
+# JWT配置
 JWT_AUTH = {
     'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),  # JWT有效期
+    'JWT_RESPONSE_PAYLOAD_HANDLER': 'users.utils.jwt_response_payload_handler',
 }
 
 # 发送邮件配置
@@ -242,3 +242,5 @@ EMAIL_HOST_PASSWORD = 'GCWYMNCEYNBLNCID'
 # 收件人看到的发件人
 EMAIL_FROM = 'jinyue<jinyueyan3@163.com>'
 
+# 修改Django用户认证后端类
+AUTHENTICATION_BACKENDS = ['users.utils.UsernameEmailAuthBackend']
