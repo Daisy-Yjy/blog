@@ -244,3 +244,8 @@ EMAIL_FROM = 'jinyue<jinyueyan3@163.com>'
 
 # 修改Django用户认证后端类
 AUTHENTICATION_BACKENDS = ['users.utils.UsernameEmailAuthBackend']
+
+# github 第三方登录配置
+GITHUB_APP_ID = '73456c421cb6da4b474e'
+GITHUB_KEY = '2923b6b5072f4f5786f56bdee1af1341c81a2048'
+GITHUB_CALLBACK_URL = 'http://127.0.0.1:8000/users/login/github_redirect/'

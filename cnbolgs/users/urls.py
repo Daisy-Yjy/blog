@@ -1,5 +1,4 @@
 from django.urls import path, re_path
-from rest_framework_jwt.views import obtain_jwt_token
 
 from . import views
 
@@ -18,9 +17,9 @@ urlpatterns = [
     path('register/', views.RegisterView.as_view()),
     # 用户账号登录
     path('login/account/', views.LoginAccountView.as_view()),
-    # path('login/account/', views.LoginView.as_view({'post': 'account'})),
     # 用户手机号登录
     path('login/mobile/', views.LoginMobileView.as_view()),
-    # path('login/mobile/', views.LoginView.as_view({'post': 'mobile'})),
     # path(r'^login/$', obtain_jwt_token),
+    # 第三方登录
+    path('login/github_redirect/', views.GithubUserView.as_view()),
 ]

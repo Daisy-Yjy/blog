@@ -2,8 +2,10 @@ import re
 from django_redis import get_redis_connection
 from rest_framework import serializers
 from rest_framework_jwt.settings import api_settings
+from itsdangerous import TimedJSONWebSignatureSerializer as TJWSSerializer, BadData
 
-from .models import User
+from .models import User, GithubUser
+from cnbolgs import settings
 
 
 class RegisterViewSerializer(serializers.ModelSerializer):
@@ -93,5 +95,65 @@ class LoginViewSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username', 'mobile', 'password', 'sms_code', 'token']
+
+
+class GithubUserViewSerializer(serializers.Serializer):
+    """openid绑定序列化器"""
+
+    openid_token = serializers.CharField(label='openid')
+    mobile = serializers.CharField(label='手机号')
+    password = serializers.CharField(label='密码', max_length=20, min_length=8)
+    sms_code = serializers.CharField(label='短信验证码')
+
+    def validate_mobile(self, value):
+        """单独校验手机号"""
+        if not re.match(r'1[3-9]\d{9}$', value):
+            raise serializers.ValidationError('手机号格式错误')
+        return value
+
+    def validate(self, attrs):
+        # 解密openid
+        openid_token = attrs.pop('openid_token')
+        serializer = TJWSSerializer(settings.SECRET_KEY, 600)
+        try:
+            data = serializer.loads(openid_token)
+            openid = data.get('openid')
+        except BadData:
+            openid = None
+        if openid is None:
+            raise serializers.ValidationError('openid无效')
+        # openid 加入到字典中
+        attrs['openid'] = openid
+
+        mobile = attrs['mobile']
+        sms_code = attrs['sms_code']
+        redis_conn = get_redis_connection('sms_codes')
+        real_sms_code = redis_conn.get('sms_%s' % mobile)
+        if real_sms_code is None or real_sms_code.decode() != sms_code:
+            raise serializers.ValidationError('验证码错误')
+        try:
+            user = User.objects.get(mobile=mobile)
+        except User.DoesNotExist:
+            pass
+        else:
+            attrs['user'] = user
+        return attrs
+
+    def create(self, validated_data):
+        user = validated_data.get('user')
+        if user is None:  # 如果没有用户创建一个新用户
+            mobile = validated_data.get('mobile')
+            password = validated_data.get('password')
+            user = User.objects.create(username=mobile, mobile=mobile)
+            user.set_password(password)
+            user.save()
+        # openid与用户绑定
+        openid = validated_data.get('openid')
+        GithubUser.objects.create(openid=openid, user=user)
+        return user
+
+
+
+
 
 
