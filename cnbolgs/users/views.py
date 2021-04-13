@@ -12,7 +12,7 @@ from itsdangerous import TimedJSONWebSignatureSerializer as TJWSSerializer
 import requests
 
 from .models import User, GithubUser
-from .serializers import RegisterViewSerializer, GithubUserViewSerializer
+from .serializers import RegisterViewSerializer, GithubUserViewSerializer, ForgetPasswordSerializer
 from libs.yuntongxun import sms
 from cnbolgs import settings
 from .utils import jwt_response_payload_handler
@@ -159,6 +159,7 @@ def github_user(access_token):
     res = requests.get(user_url, headers=headers)
     if res.status_code == 200:
         user_info = res.json()
+        print(22, user_info)
         return user_info
     return None
 
@@ -167,6 +168,7 @@ class GithubUserView(APIView):
     """github第三方登录处理"""
 
     def get(self, request):
+
         req_code = request.query_params.get('code', None)  # 获取授权码code
         if not req_code:
             return Response({'message': '缺少code'}, status=status.HTTP_400_BAD_REQUEST)
@@ -175,7 +177,6 @@ class GithubUserView(APIView):
             user_info = github_user(access_token)  # 向GitHub用户API发送请求获取信息
             if user_info:
                 openid = user_info.get('id')
-                login_name = user_info.get('login')
         except:
             return Response({'message': 'Github服务器不可用'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
@@ -212,3 +213,33 @@ class GithubUserView(APIView):
         return Response({'token': token, 'username': user.username, 'user_id': user.id})
 
 
+class ForgetUsernamePassword(APIView):
+    """忘记用户名和密码"""
+
+    def get(self, request, email):
+        """忘记用户名"""
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'message': '该邮箱未注册'})
+        else:
+            username = user.username
+            subject = "cnblog登录用户名找回"  # 邮件主题/标题
+            html_message = '<p>您好，您在cnblog的登录名是：%s' % username
+            # send_mail(subject:标题, message:普通邮件正文, 发件人, [收件人], html_message=超文本的邮件内容)
+            send_mail(subject, '', settings.EMAIL_FROM, [email], html_message=html_message)
+            return Response({'message': 'OK'})
+
+    def post(self, request):
+        """忘记密码"""
+
+        serializer = ForgetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        # 生成token
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER  # 引用jwt_payload_handler函数(生成payload)
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER  # 生成jwt
+        payload = jwt_payload_handler(user)  # 根据user生成用户相关的载荷
+        token = jwt_encode_handler(payload)  # 传入载荷生成完整的jwt
+        return Response({'token': token, 'username': user.username, 'user_id': user.id})

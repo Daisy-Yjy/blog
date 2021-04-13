@@ -22,4 +22,8 @@ urlpatterns = [
     # path(r'^login/$', obtain_jwt_token),
     # 第三方登录
     path('login/github_redirect/', views.GithubUserView.as_view()),
+    # 忘记用户名
+    re_path(r'forget_username/(?P<email>[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3})/', views.ForgetUsernamePassword.as_view()),
+    # 忘记密码
+    path('forget_password/', views.ForgetUsernamePassword.as_view()),
 ]

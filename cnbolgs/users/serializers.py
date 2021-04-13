@@ -101,14 +101,22 @@ class GithubUserViewSerializer(serializers.Serializer):
     """openid绑定序列化器"""
 
     openid_token = serializers.CharField(label='openid')
+    email = serializers.CharField(label='邮箱')
     mobile = serializers.CharField(label='手机号')
     password = serializers.CharField(label='密码', max_length=20, min_length=8)
     sms_code = serializers.CharField(label='短信验证码')
+    email_code = serializers.CharField(label='邮箱验证码')
 
     def validate_mobile(self, value):
         """单独校验手机号"""
         if not re.match(r'1[3-9]\d{9}$', value):
             raise serializers.ValidationError('手机号格式错误')
+        return value
+
+    def validate_email(self, value):
+        """单独验证邮箱"""
+        if not re.match(r'[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$', value):
+            raise serializers.ValidationError('邮箱格式错误')
         return value
 
     def validate(self, attrs):
@@ -127,10 +135,16 @@ class GithubUserViewSerializer(serializers.Serializer):
 
         mobile = attrs['mobile']
         sms_code = attrs['sms_code']
-        redis_conn = get_redis_connection('sms_codes')
-        real_sms_code = redis_conn.get('sms_%s' % mobile)
-        if real_sms_code is None or real_sms_code.decode() != sms_code:
-            raise serializers.ValidationError('验证码错误')
+        email_code = attrs['email_code']
+        redis_conn_sms = get_redis_connection('sms_codes')
+        real_sms_code = redis_conn_sms.get('sms_%s' % attrs['mobile'])
+        if real_sms_code is None or sms_code != real_sms_code.decode():
+            raise serializers.ValidationError('短信验证码错误')
+        redis_conn_email = get_redis_connection('email_codes')
+        real_email_code = redis_conn_email.get('email_%s' % attrs['email'])
+        if real_email_code is None or email_code != real_email_code.decode():
+            raise serializers.ValidationError('邮箱验证码错误')
+
         try:
             user = User.objects.get(mobile=mobile)
         except User.DoesNotExist:
@@ -144,13 +158,51 @@ class GithubUserViewSerializer(serializers.Serializer):
         if user is None:  # 如果没有用户创建一个新用户
             mobile = validated_data.get('mobile')
             password = validated_data.get('password')
-            user = User.objects.create(username=mobile, mobile=mobile)
+            email = validated_data.get('email')
+            user = User.objects.create(username=mobile, mobile=mobile, email=email)
             user.set_password(password)
             user.save()
         # openid与用户绑定
         openid = validated_data.get('openid')
         GithubUser.objects.create(openid=openid, user=user)
         return user
+
+
+class ForgetPasswordSerializer(serializers.Serializer):
+    """忘记密码序列化器"""
+    email = serializers.CharField(label='邮箱')
+    email_code = serializers.CharField(label='邮箱验证码')
+    password = serializers.CharField(label='输入密码', write_only=True)
+    password2 = serializers.CharField(label='确认密码', write_only=True)
+
+    def validate_email(self, value):
+        """单独验证邮箱"""
+        if not re.match(r'[0-9a-zA-Z_]{0,19}@[0-9a-zA-Z]{1,13}\.[com,cn,net]{1,3}$', value):
+            raise serializers.ValidationError('邮箱格式错误')
+        return value
+
+    def validate(self, attrs):
+        """"校验密码、邮箱验证码"""
+
+        if attrs['password2'] != attrs['password']:
+            raise serializers.ValidationError('两个密码不一致')
+        redis_conn_email = get_redis_connection('email_codes')
+        real_email_code = redis_conn_email.get('email_%s' % attrs['email'])
+        if real_email_code is None or attrs['email_code'] != real_email_code.decode():
+            raise serializers.ValidationError('邮箱验证码错误')
+        return attrs
+
+    def create(self, validated_data):
+        del validated_data['password2']
+        del validated_data['email_code']
+
+        email = validated_data.get('email')
+        password = validated_data.get('password')
+        user = User.objects.get(email=email)
+        user.set_password(password)
+        user.save()
+        return user
+
 
 
 
