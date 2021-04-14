@@ -243,3 +243,4 @@ class ForgetUsernamePassword(APIView):
         payload = jwt_payload_handler(user)  # 根据user生成用户相关的载荷
         token = jwt_encode_handler(payload)  # 传入载荷生成完整的jwt
         return Response({'token': token, 'username': user.username, 'user_id': user.id})
+
