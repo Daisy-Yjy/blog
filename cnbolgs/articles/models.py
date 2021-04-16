@@ -60,9 +60,11 @@ class Article(models.Model):
     content = models.TextField(verbose_name='文章内容', null=True, blank=True)
     views = models.PositiveIntegerField(default=0, verbose_name='浏览量')
     status = models.PositiveSmallIntegerField(choices=ARTICLE_STATUS_CHOICES, default=1, verbose_name='文章状态')
-    comment_count = models.IntegerField(default=0, verbose_name='评论数')
-    up_count = models.IntegerField(default=0, verbose_name='点赞数')
-    down_count = models.IntegerField(default=0, verbose_name='反对数')
+
+    comment_count = models.PositiveIntegerField(default=0, verbose_name='评论数')
+    up_count = models.PositiveIntegerField(default=0, verbose_name='点赞数')
+    down_count = models.PositiveIntegerField(default=0, verbose_name='反对数')
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='作者')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, verbose_name='分类', null=True)
     tags = models.ManyToManyField(Tag, through='ArticleTag', through_fields=('article', 'tag'),
@@ -96,9 +98,11 @@ class ArticleComment(models.Model):
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, verbose_name='文章')
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='评论用户')
+
     content = models.CharField(max_length=1000, verbose_name='评论内容')
     create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
     parent_comment = models.ForeignKey('self', on_delete=models.CASCADE, null=True)
+    is_delete = models.BooleanField(default=False, verbose_name='是否删除')
 
     class Meta:
         db_table = 'tb_article_comment'
@@ -114,7 +118,7 @@ class ArtileUpDown(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='用户')
     article = models.ForeignKey(Article, on_delete=models.CASCADE, verbose_name='文章')
-    ups = models.TextField(default=',')
+    is_up = models.PositiveSmallIntegerField(default=0, verbose_name='是否点赞')
 
     class Meta:
         db_table = 'tb_article_up_down'

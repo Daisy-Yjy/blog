@@ -222,7 +222,7 @@ REST_FRAMEWORK = {
     ),
     # 分页
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,  # 每页数目
+    'PAGE_SIZE': 3,  # 每页数目
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
 }
 
@@ -250,3 +250,9 @@ AUTHENTICATION_BACKENDS = ['users.utils.UsernameEmailAuthBackend']
 GITHUB_APP_ID = '73456c421cb6da4b474e'
 GITHUB_KEY = '2923b6b5072f4f5786f56bdee1af1341c81a2048'
 GITHUB_CALLBACK_URL = 'http://127.0.0.1:8000/users/login/github_redirect/'
+
+# 用户上传配置
+MEDIA_URL = "/media/"
+MEDIA_ROOT = (
+    os.path.join(BASE_DIR, 'media')
+)
