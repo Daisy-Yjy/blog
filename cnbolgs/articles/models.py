@@ -81,6 +81,7 @@ class Article(models.Model):
 
 class ArticleTag(models.Model):
     """文章标签中间表"""
+
     article = models.ForeignKey(Article, on_delete=models.CASCADE, verbose_name='文章')
     tag = models.ForeignKey(Tag, on_delete=models.CASCADE, verbose_name='标签')
 

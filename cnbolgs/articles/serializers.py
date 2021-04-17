@@ -90,6 +90,6 @@ class ArtileUpDownSerializer(serializers.ModelSerializer):
             article.up_count += 1
             article.save()
         if validated_data.get('is_up') == 2:
-            article.up_count -= 1
+            article.down_count += 1
             article.save()
         return up_down
